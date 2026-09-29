@@ -85,7 +85,8 @@
                 name: 'Administrador Master',
                 phone: '(15) 99999-9999',
                 city: 'Itapetininga',
-                role: 'ADMIN'
+                role: 'ADMIN',
+                avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80'
             }
         ];
 
@@ -107,6 +108,7 @@
                 description: 'Cão dócil, atende pelo nome de Thor. Usando coleira azul. Perdeu-se próximo à praça central.',
                 status: 'Em Busca',
                 reporterName: 'Carlos Silva',
+                reporterEmail: 'carlos@email.com',
                 messages: [
                     { sender: 'Maria Santos', text: 'Olá Carlos! Vi um cão muito parecido perto do supermercado ontem às 18h.', time: '10/03/2026 19:30' },
                     { sender: 'Carlos Silva', text: 'Oi Maria! Muito obrigado pela ajuda! Teria fotos dele?', time: '10/03/2026 19:42' }
@@ -129,6 +131,7 @@
                 description: 'Gato muito dócil encontrado assustado no jardim de uma residência. Sem coleira.',
                 status: 'Aguardando Tutor',
                 reporterName: 'Fernanda Lima',
+                reporterEmail: 'admin@auchou.com',
                 messages: [
                     { sender: 'João Pedro', text: 'Boa tarde! Ele possui uma mancha preta no queixo?', time: '11/03/2026 14:10' }
                 ]
@@ -150,6 +153,7 @@
                 description: 'Calopsita amarela e cinza, responde por Pipoca e assobia a música do Pica-Pau.',
                 status: 'Reencontrado',
                 reporterName: 'Beatriz Rocha',
+                reporterEmail: 'beatriz@email.com',
                 messages: []
             }
         ];
@@ -157,9 +161,8 @@
         let activeDetailPet = null;
         let activeChatPetId = null;
         let speciesChart = null;
-        let speciesHorizontalChart = null;
 
-        // --- AUTHENTICATION & REGISTRATION FUNCTIONS ---
+        // --- STREAMING_CHUNK: Authenticating and initializing user sessions ---
         function handleLogin(e) {
             if (e) e.preventDefault();
             const email = document.getElementById('login-email').value.trim();
@@ -183,7 +186,8 @@
                 name: account.name,
                 email: account.email,
                 phone: account.phone,
-                city: account.city
+                city: account.city,
+                avatar: account.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80'
             };
 
             updateUserUI();
@@ -211,7 +215,6 @@
             const city = document.getElementById('reg-acc-city').value.trim();
             const errorEl = document.getElementById('reg-acc-error');
 
-            // Validation: Password min 8 chars, at least 1 uppercase letter, 1 number
             const passwordRegex = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
             if (!passwordRegex.test(password)) {
                 errorEl.textContent = 'A senha deve ter no mínimo 8 dígitos, contendo pelo menos 1 letra maiúscula e 1 número.';
@@ -219,7 +222,6 @@
                 return;
             }
 
-            // Check if email already exists
             if (registeredAccounts.some(acc => acc.email === email)) {
                 errorEl.textContent = 'Este e-mail já está cadastrado no sistema.';
                 errorEl.classList.remove('hidden');
@@ -232,7 +234,8 @@
                 name,
                 phone,
                 city,
-                role: 'TUTOR'
+                role: 'TUTOR',
+                avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80'
             };
 
             registeredAccounts.push(newAccount);
@@ -249,7 +252,8 @@
                 name: 'Visitante',
                 email: '',
                 phone: '',
-                city: ''
+                city: '',
+                avatar: ''
             };
             document.getElementById('auth-screen').classList.remove('hidden');
             document.getElementById('login-email').value = '';
@@ -260,10 +264,14 @@
         function updateUserUI() {
             const nameEl = document.getElementById('user-display-name');
             const roleEl = document.getElementById('user-display-role');
+            const avatarEl = document.getElementById('user-display-avatar');
             const adminNavBtn = document.getElementById('nav-admin-btn');
 
             if (nameEl) nameEl.textContent = currentUser.name;
             if (roleEl) roleEl.textContent = currentUser.role === 'ADMIN' ? 'Administrador' : 'Tutor';
+            if (avatarEl && currentUser.avatar) {
+                avatarEl.src = currentUser.avatar;
+            }
 
             if (adminNavBtn) {
                 if (currentUser.role === 'ADMIN') {
@@ -272,6 +280,127 @@
                     adminNavBtn.classList.add('hidden');
                 }
             }
+        }
+
+        // --- STREAMING_CHUNK: Profile management and pet editing functions ---
+        function updateProfile(e) {
+            e.preventDefault();
+            const name = document.getElementById('profile-name').value.trim();
+            const phone = document.getElementById('profile-phone').value.trim();
+            const city = document.getElementById('profile-city').value.trim();
+            const avatar = document.getElementById('profile-avatar').value.trim();
+
+            currentUser.name = name;
+            currentUser.phone = phone;
+            currentUser.city = city;
+            if (avatar) currentUser.avatar = avatar;
+
+            const acc = registeredAccounts.find(a => a.email === currentUser.email);
+            if (acc) {
+                acc.name = name;
+                acc.phone = phone;
+                acc.city = city;
+                if (avatar) acc.avatar = avatar;
+            }
+
+            updateUserUI();
+            renderProfileView();
+            showGlobalAlert('Perfil atualizado com sucesso!', 'success');
+        }
+
+        function renderProfileView() {
+            if (!currentUser.isLoggedIn) return;
+
+            document.getElementById('profile-name').value = currentUser.name;
+            document.getElementById('profile-email').value = currentUser.email;
+            document.getElementById('profile-phone').value = currentUser.phone;
+            document.getElementById('profile-city').value = currentUser.city;
+            document.getElementById('profile-avatar').value = currentUser.avatar || '';
+            document.getElementById('profile-avatar-preview').src = currentUser.avatar || 'https://placehold.co/100x100/370926/ffffff?text=Avatar';
+
+            // Render my pets
+            const myPetsContainer = document.getElementById('my-pets-list');
+            if (!myPetsContainer) return;
+            myPetsContainer.innerHTML = '';
+
+            const myPets = petsData.filter(p => p.reporterEmail === currentUser.email || currentUser.role === 'ADMIN');
+
+            if (myPets.length === 0) {
+                myPetsContainer.innerHTML = '<p class="text-xs text-slate-400 p-4 bg-[#370926]/40 rounded-xl">Você ainda não registrou nenhum animal na plataforma.</p>';
+                return;
+            }
+
+            myPets.forEach(pet => {
+                myPetsContainer.innerHTML += `
+                    <div class="bg-[#1C0118] border border-[#370926] rounded-2xl p-4 flex items-center justify-between gap-4">
+                        <div class="flex items-center gap-3">
+                            <img src="${pet.photo}" alt="${pet.name}" class="w-14 h-14 rounded-xl object-cover border border-[#6BD425]/40" onerror="this.src='https://placehold.co/100x100/370926/ffffff?text=Pet'">
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h4 class="font-bold text-sm text-white">${pet.name}</h4>
+                                    <span class="text-[10px] bg-[#370926] text-[#6BD425] px-2 py-0.5 rounded-md border border-[#6BD425]/30">${pet.id}</span>
+                                </div>
+                                <p class="text-xs text-slate-400 mt-0.5">${pet.species} • ${pet.breed || 'SRD'} • Status: <strong class="text-white">${pet.status}</strong></p>
+                                <p class="text-[11px] text-slate-500 mt-1"><i class="fa-solid fa-location-dot mr-1"></i> ${pet.address}</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="openEditPetModal('${pet.id}')" class="bg-[#370926] hover:bg-[#42113C] text-[#6BD425] border border-[#6BD425]/30 text-xs px-3 py-2 rounded-xl transition flex items-center gap-1.5 font-medium">
+                                <i class="fa-solid fa-pen"></i> Editar
+                            </button>
+                            <button onclick="deletePetFromProfile('${pet.id}')" class="bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-800/40 text-xs px-3 py-2 rounded-xl transition">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        let activeEditingPetId = null;
+        function openEditPetModal(id) {
+            const pet = petsData.find(p => p.id === id);
+            if (!pet) return;
+
+            activeEditingPetId = pet.id;
+            document.getElementById('edit-pet-name').value = pet.name;
+            document.getElementById('edit-pet-breed').value = pet.breed || '';
+            document.getElementById('edit-pet-color').value = pet.color || '';
+            document.getElementById('edit-pet-status').value = pet.status;
+            document.getElementById('edit-pet-reward').value = pet.reward || '';
+            document.getElementById('edit-pet-description').value = pet.description || '';
+
+            document.getElementById('modal-edit-pet').classList.remove('hidden');
+        }
+
+        function closeEditPetModal() {
+            document.getElementById('modal-edit-pet').classList.add('hidden');
+            activeEditingPetId = null;
+        }
+
+        function handleEditPetSubmit(e) {
+            e.preventDefault();
+            const pet = petsData.find(p => p.id === activeEditingPetId);
+            if (!pet) return;
+
+            pet.name = document.getElementById('edit-pet-name').value;
+            pet.breed = document.getElementById('edit-pet-breed').value;
+            pet.color = document.getElementById('edit-pet-color').value;
+            pet.status = document.getElementById('edit-pet-status').value;
+            pet.reward = document.getElementById('edit-pet-reward').value;
+            pet.description = document.getElementById('edit-pet-description').value;
+
+            closeEditPetModal();
+            renderProfileView();
+            applyFilters();
+            showGlobalAlert('Registro atualizado com sucesso!', 'success');
+        }
+
+        function deletePetFromProfile(id) {
+            petsData = petsData.filter(p => p.id !== id);
+            renderProfileView();
+            applyFilters();
+            showGlobalAlert('Registro excluído com sucesso.', 'success');
         }
 
         function locateUserOnMap() {
@@ -319,7 +448,6 @@
         }
 
         function switchTab(tabId) {
-            // Restriction check for Admin view
             if (tabId === 'admin-view' && currentUser.role !== 'ADMIN') {
                 showGlobalAlert('Acesso restrito a administradores.', 'error');
                 return;
@@ -340,6 +468,8 @@
                 renderCasesGrid();
             } else if (tabId === 'messages-view') {
                 renderChatThreads();
+            } else if (tabId === 'profile-view') {
+                renderProfileView();
             } else if (tabId === 'admin-view') {
                 renderAdminDashboard();
             }
@@ -399,11 +529,16 @@
                                 <p class="text-xs text-slate-300 mt-2 line-clamp-2"><i class="fa-solid fa-location-dot text-[#6BD425] mr-1"></i> ${pet.address}</p>
                             </div>
                             
-                            <div class="pt-2 border-t border-[#370926] flex items-center justify-between text-xs">
+                            <div class="pt-2 border-t border-[#370926] flex items-center justify-between text-xs gap-2">
                                 <span class="text-slate-500"><i class="fa-regular fa-calendar mr-1"></i> ${pet.date}</span>
-                                <button onclick="openPetDetails('${pet.id}')" class="bg-[#6BD425] hover:bg-[#58b21e] text-slate-950 font-medium px-3.5 py-1.5 rounded-lg transition shadow-sm">
-                                    Ver Detalhes
-                                </button>
+                                <div class="flex gap-2">
+                                    <button onclick="openChatWithPet('${pet.id}')" class="bg-[#370926] hover:bg-[#42113C] border border-[#6BD425]/40 text-[#6BD425] font-medium px-3 py-1.5 rounded-lg transition shadow-sm" title="Conversar com o Tutor">
+                                        <i class="fa-solid fa-comments"></i>
+                                    </button>
+                                    <button onclick="openPetDetails('${pet.id}')" class="bg-[#6BD425] hover:bg-[#58b21e] text-slate-950 font-medium px-3.5 py-1.5 rounded-lg transition shadow-sm">
+                                        Ver Detalhes
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -449,6 +584,156 @@
         function closeDetailsModal() {
             document.getElementById('modal-details').classList.add('hidden');
             activeDetailPet = null;
+        }
+
+        // --- FIXED CHAT / MESSAGING FUNCTIONS ---
+        function openChatWithPet(petId) {
+            const pet = petsData.find(p => p.id === petId);
+            if (!pet) return;
+
+            activeChatPetId = pet.id;
+            closeDetailsModal();
+            switchTab('messages-view');
+        }
+
+        function renderChatThreads() {
+            const listContainer = document.getElementById('chat-threads-list');
+            const chatArea = document.getElementById('active-chat-area');
+            if (!listContainer) return;
+
+            listContainer.innerHTML = '';
+
+            if (petsData.length === 0) {
+                listContainer.innerHTML = '<p class="text-xs text-slate-500 p-4">Nenhum caso cadastrado.</p>';
+                return;
+            }
+
+            // If no active chat selected by default, select the first one
+            if (!activeChatPetId && petsData.length > 0) {
+                activeChatPetId = petsData[0].id;
+            }
+
+            petsData.forEach(pet => {
+                const isActive = pet.id === activeChatPetId;
+                const activeClass = isActive ? 'bg-[#370926] border-[#6BD425]/50' : 'bg-[#1C0118] border-[#370926] hover:bg-[#370926]/50';
+                const lastMsg = pet.messages && pet.messages.length > 0 ? pet.messages[pet.messages.length - 1].text : 'Nenhuma mensagem ainda. Inicie a conversa!';
+
+                const threadHtml = `
+                    <div onclick="selectChatThread('${pet.id}')" class="p-4 rounded-xl border ${activeClass} cursor-pointer transition flex items-center gap-3">
+                        <img src="${pet.photo}" alt="${pet.name}" class="w-12 h-12 rounded-full object-cover border border-[#6BD425]/30" onerror="this.src='https://placehold.co/100x100/370926/ffffff?text=Pet'">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex justify-between items-center">
+                                <h4 class="font-bold text-sm text-slate-100 truncate">${pet.name} (${pet.id})</h4>
+                                <span class="text-[10px] text-slate-400">${pet.category}</span>
+                            </div>
+                            <p class="text-xs text-slate-400 truncate mt-0.5">Tutor: ${pet.reporterName}</p>
+                            <p class="text-[11px] text-slate-500 truncate mt-1 italic">${lastMsg}</p>
+                        </div>
+                    </div>
+                `;
+                listContainer.innerHTML += threadHtml;
+            });
+
+            renderActiveChatBox();
+        }
+
+        function selectChatThread(petId) {
+            activeChatPetId = petId;
+            renderChatThreads();
+        }
+
+        function renderActiveChatBox() {
+            const chatArea = document.getElementById('active-chat-area');
+            if (!chatArea) return;
+
+            const pet = petsData.find(p => p.id === activeChatPetId);
+            if (!pet) {
+                chatArea.innerHTML = '<div class="flex-1 flex items-center justify-center text-slate-500 text-sm">Selecione uma conversa ao lado.</div>';
+                return;
+            }
+
+            let messagesHtml = '';
+            if (!pet.messages || pet.messages.length === 0) {
+                messagesHtml = '<div class="text-center text-slate-500 text-xs my-auto py-12"><i class="fa-regular fa-comment-dots text-3xl mb-2 text-[#6BD425]/40"></i><p>Inicie a conversa com o tutor(a) <strong>' + pet.reporterName + '</strong> sobre o pet <strong>' + pet.name + '</strong>.</p></div>';
+            } else {
+                pet.messages.forEach(msg => {
+                    const isMe = msg.sender === currentUser.name || msg.sender === 'Você';
+                    const bubbleAlign = isMe ? 'ml-auto bg-[#618B25] text-white rounded-br-none' : 'mr-auto bg-[#370926] text-slate-200 border border-[#42113C] rounded-bl-none';
+                    messagesHtml += `
+                        <div class="max-w-[80%] rounded-2xl px-4 py-3 text-xs shadow-sm ${bubbleAlign}">
+                            <div class="flex justify-between items-center gap-4 mb-1 text-[10px] opacity-80 font-medium">
+                                <span>${msg.sender}</span>
+                                <span>${msg.time}</span>
+                            </div>
+                            <p class="leading-relaxed">${msg.text}</p>
+                        </div>
+                    `;
+                });
+            }
+
+            chatArea.innerHTML = `
+                <!-- Chat Header -->
+                <div class="p-4 bg-[#1C0118] border-b border-[#370926] flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <img src="${pet.photo}" alt="${pet.name}" class="w-10 h-10 rounded-full object-cover border border-[#6BD425]/30" onerror="this.src='https://placehold.co/100x100/370926/ffffff?text=Pet'">
+                        <div>
+                            <h3 class="font-bold text-sm text-white">${pet.name} <span class="text-xs font-normal text-slate-400">(${pet.id})</span></h3>
+                            <p class="text-xs text-[#6BD425]">Tutor(a): ${pet.reporterName} • Tel: ${pet.contact}</p>
+                        </div>
+                    </div>
+                    <a href="tel:${pet.contact}" class="bg-[#370926] hover:bg-[#42113C] text-[#6BD425] border border-[#6BD425]/30 text-xs px-3.5 py-2 rounded-xl transition flex items-center gap-2">
+                        <i class="fa-solid fa-phone"></i> Ligar
+                    </a>
+                </div>
+
+                <!-- Messages Scroll Area -->
+                <div id="chat-messages-scroll" class="flex-1 p-4 overflow-y-auto space-y-3 custom-scrollbar flex flex-col">
+                    ${messagesHtml}
+                </div>
+
+                <!-- Chat Input Bar -->
+                <form onsubmit="handleSendMessage(event)" class="p-3 bg-[#1C0118] border-t border-[#370926] flex gap-2 items-center">
+                    <input type="text" id="chat-input-text" placeholder="Digite sua mensagem para o tutor..." class="flex-1 bg-[#370926] border border-[#42113C] text-slate-200 placeholder-slate-400 text-xs rounded-xl px-4 py-3 focus:outline-none focus:border-[#6BD425]">
+                    <button type="submit" class="bg-[#6BD425] hover:bg-[#58b21e] text-slate-950 font-semibold px-5 py-3 rounded-xl transition text-xs flex items-center gap-2 shadow-sm">
+                        <i class="fa-solid fa-paper-plane"></i> Enviar
+                    </button>
+                </form>
+            `;
+
+            // Scroll to bottom of chat
+            const scrollContainer = document.getElementById('chat-messages-scroll');
+            if (scrollContainer) {
+                scrollContainer.scrollTop = scrollContainer.scrollHeight;
+            }
+        }
+
+        function handleSendMessage(e) {
+            e.preventDefault();
+            const input = document.getElementById('chat-input-text');
+            if (!input) return;
+            const text = input.value.trim();
+            if (!text) return;
+
+            const pet = petsData.find(p => p.id === activeChatPetId);
+            if (!pet) return;
+
+            const now = new Date();
+            const timeStr = now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+            const senderName = currentUser.isLoggedIn ? currentUser.name : 'Visitante Anônimo';
+
+            if (!pet.messages) {
+                pet.messages = [];
+            }
+
+            pet.messages.push({
+                sender: senderName,
+                text: text,
+                time: timeStr
+            });
+
+            input.value = '';
+            renderChatThreads();
         }
 
         function openRegisterModal() {
@@ -538,257 +823,75 @@
                 reward,
                 description,
                 status: category === 'PERDI' ? 'Em Busca' : 'Aguardando Tutor',
-                reporterName: currentUser.isLoggedIn ? currentUser.name : 'Tutor Visitante',
+                reporterName: currentUser.isLoggedIn ? currentUser.name : 'Cidadão',
+                reporterEmail: currentUser.isLoggedIn ? currentUser.email : 'anonimo@email.com',
                 messages: []
             };
 
             petsData.unshift(newPet);
             closeRegisterModal();
-            document.getElementById('register-pet-form').reset();
+            document.getElementById('form-register').reset();
             document.getElementById('photo-preview-container').classList.add('hidden');
-
-            showGlobalAlert(`Ocorrência registrada com sucesso! Protocolo: ${protocolId}`, 'success');
             applyFilters();
-            switchTab('map-view');
-        }
-
-        function openChatThread(petId) {
-            activeChatPetId = petId;
-            renderChatThreads();
-
-            const pet = petsData.find(p => p.id === petId);
-            if (!pet) return;
-
-            document.getElementById('chat-empty-view').classList.add('hidden');
-            document.getElementById('chat-active-view').classList.remove('hidden');
-
-            document.getElementById('chat-header-avatar').textContent = pet.name.charAt(0).toUpperCase();
-            document.getElementById('chat-header-title').textContent = `${pet.name} (${pet.species})`;
-            document.getElementById('chat-header-protocol').textContent = `Protocolo: ${pet.id} • Tutor: ${pet.reporterName}`;
-            document.getElementById('chat-header-badge').textContent = pet.category === 'PERDI' ? '🔴 PET PERDIDO' : '🔵 PET ENCONTRADO';
-
-            renderChatMessages();
-        }
-
-        function renderChatThreads() {
-            const container = document.getElementById('chat-threads-list');
-            if (!container) return;
-            container.innerHTML = '';
-
-            petsData.forEach(pet => {
-                const isSelected = pet.id === activeChatPetId;
-                const bg = isSelected ? 'bg-[#370926] border-[#6BD425]/40' : 'bg-[#1C0118] border-[#370926] hover:bg-[#370926]/40';
-                const lastMsg = pet.messages && pet.messages.length > 0 ? pet.messages[pet.messages.length - 1].text : 'Nenhuma mensagem ainda.';
-
-                const item = `
-                    <div onclick="openChatThread('${pet.id}')" class="p-3.5 rounded-xl border ${bg} cursor-pointer transition flex items-center gap-3">
-                        <img src="${pet.photo}" class="w-12 h-12 rounded-xl object-cover" onerror="this.src='https://placehold.co/100x100/370926/ffffff?text=Pet'">
-                        <div class="flex-1 min-w-0">
-                            <div class="flex justify-between items-center mb-0.5">
-                                <h4 class="font-bold text-xs text-slate-200 truncate">${pet.name}</h4>
-                                <span class="text-[10px] font-mono text-slate-500">${pet.id}</span>
-                            </div>
-                            <p class="text-[11px] text-slate-400 truncate">${lastMsg}</p>
-                        </div>
-                    </div>
-                `;
-                container.innerHTML += item;
-            });
-        }
-
-        function renderChatMessages() {
-            const body = document.getElementById('chat-messages-body');
-            if (!body) return;
-            body.innerHTML = '';
-
-            const pet = petsData.find(p => p.id === activeChatPetId);
-            if (!pet || !pet.messages) return;
-
-            if (pet.messages.length === 0) {
-                body.innerHTML = '<div class="text-center text-xs text-slate-400 py-6">Inicie a conversa sobre este animal.</div>';
-                return;
-            }
-
-            pet.messages.forEach(msg => {
-                const isMe = msg.sender === currentUser.name;
-                const align = isMe ? 'justify-end' : 'justify-start';
-                const bg = isMe ? 'bg-[#6BD425] text-slate-950 font-medium' : 'bg-[#370926] border border-[#42113C] text-slate-200';
-
-                const msgHtml = `
-                    <div class="flex ${align}">
-                        <div class="max-w-[80%] rounded-2xl px-4 py-2.5 shadow-sm ${bg}">
-                            <div class="flex items-center gap-2 mb-1">
-                                <span class="text-[10px] font-bold ${isMe ? 'text-slate-900' : 'text-[#6BD425]'}">${msg.sender}</span>
-                                <span class="text-[9px] ${isMe ? 'text-slate-800' : 'text-slate-400'}">${msg.time}</span>
-                            </div>
-                            <p class="text-xs leading-relaxed">${msg.text}</p>
-                        </div>
-                    </div>
-                `;
-                body.innerHTML += msgHtml;
-            });
-
-            body.scrollTop = body.scrollHeight;
-        }
-
-        function sendChatMessage(e) {
-            e.preventDefault();
-            const input = document.getElementById('chat-input-text');
-            if (!input) return;
-            const text = input.value.trim();
-            if (!text || !activeChatPetId) return;
-
-            const pet = petsData.find(p => p.id === activeChatPetId);
-            if (!pet) return;
-
-            if (!pet.messages) pet.messages = [];
-
-            const now = new Date();
-            const formattedTime = `${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-
-            pet.messages.push({
-                sender: currentUser.name,
-                text: text,
-                time: formattedTime
-            });
-
-            input.value = '';
-            renderChatMessages();
-            renderChatThreads();
+            showGlobalAlert(`Pet cadastrado com sucesso! Protocolo: ${protocolId}`, 'success');
         }
 
         function renderAdminDashboard() {
-            const total = petsData.length;
-            const lost = petsData.filter(p => p.category === 'PERDI').length;
-            const found = petsData.filter(p => p.category === 'ACHEI').length;
-            const resolved = petsData.filter(p => p.status === 'Reencontrado').length;
+            const totalCases = petsData.length;
+            const lostCases = petsData.filter(p => p.category === 'PERDI').length;
+            const foundCases = petsData.filter(p => p.category === 'ACHEI').length;
+            const resolvedCases = petsData.filter(p => p.status === 'Reencontrado').length;
 
-            const elTotal = document.getElementById('metric-total');
-            if (elTotal) elTotal.textContent = total;
-            const elLost = document.getElementById('metric-lost');
-            if (elLost) elLost.textContent = lost;
-            const elFound = document.getElementById('metric-found');
-            if (elFound) elFound.textContent = found;
-            const elResolved = document.getElementById('metric-resolved');
-            if (elResolved) elResolved.textContent = resolved;
+            document.getElementById('stat-total').textContent = totalCases;
+            document.getElementById('stat-lost').textContent = lostCases;
+            document.getElementById('stat-found').textContent = foundCases;
+            document.getElementById('stat-resolved').textContent = resolvedCases;
 
-            renderAdminCharts(lost, found, resolved);
-            renderAdminTable();
-        }
-
-        function renderAdminCharts(lost, found, resolved) {
-            const speciesMap = {
-                'Cão': 0,
-                'Gato': 0,
-                'Ave': 0,
-                'Animais de Criação': 0,
-                'Outros': 0
-            };
-
-            petsData.forEach(p => {
-                if (speciesMap[p.species] !== undefined) {
-                    speciesMap[p.species]++;
-                } else {
-                    speciesMap['Outros'] = (speciesMap['Outros'] || 0) + 1;
-                }
-            });
-
-            if (speciesChart) speciesChart.destroy();
-            if (speciesHorizontalChart) speciesHorizontalChart.destroy();
-
-            const paletteColors = ['#6BD425', '#618B25', '#42113C', '#370926', '#8A89C0'];
-
-            const ctxSpeciesEl = document.getElementById('chart-species');
-            if (ctxSpeciesEl) {
-                speciesChart = new Chart(ctxSpeciesEl.getContext('2d'), {
-                    type: 'doughnut',
-                    data: {
-                        labels: Object.keys(speciesMap),
-                        datasets: [{
-                            data: Object.values(speciesMap),
-                            backgroundColor: paletteColors
-                        }]
-                    },
-                    options: { responsive: true, maintainAspectRatio: false }
+            // Render table
+            const tbody = document.getElementById('admin-table-body');
+            if (tbody) {
+                tbody.innerHTML = '';
+                petsData.forEach(pet => {
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-[#370926]/40 transition border-b border-[#370926]">
+                            <td class="px-4 py-3 font-mono text-xs text-[#6BD425]">${pet.id}</td>
+                            <td class="px-4 py-3 font-semibold text-slate-100">${pet.name}</td>
+                            <td class="px-4 py-3 text-slate-300">${pet.species} (${pet.category})</td>
+                            <td class="px-4 py-3 text-slate-300">${pet.status}</td>
+                            <td class="px-4 py-3 text-right">
+                                <button onclick="openPetDetails('${pet.id}')" class="text-[#6BD425] hover:underline mr-3 text-xs">Ver</button>
+                                <button onclick="deletePet('${pet.id}')" class="text-red-400 hover:underline text-xs">Excluir</button>
+                            </td>
+                        </tr>
+                    `;
                 });
             }
 
-            const ctxHorizontalEl = document.getElementById('chart-species-horizontal');
-            if (ctxHorizontalEl) {
-                speciesHorizontalChart = new Chart(ctxHorizontalEl.getContext('2d'), {
-                    type: 'bar',
+            // Charts
+            const ctxSpecies = document.getElementById('chartSpecies');
+            if (ctxSpecies) {
+                if (speciesChart) speciesChart.destroy();
+                const speciesCount = { Cão: 0, Gato: 0, Ave: 0, Outros: 0 };
+                petsData.forEach(p => {
+                    if (speciesCount[p.species] !== undefined) speciesCount[p.species]++;
+                    else speciesCount.Outros++;
+                });
+
+                speciesChart = new Chart(ctxSpecies, {
+                    type: 'doughnut',
                     data: {
-                        labels: ['Cães', 'Gatos', 'Aves', 'Animais de Criação'],
+                        labels: ['Cães', 'Gatos', 'Aves', 'Outros'],
                         datasets: [{
-                            label: 'Número de Postagens',
-                            data: [
-                                speciesMap['Cão'],
-                                speciesMap['Gato'],
-                                speciesMap['Ave'],
-                                speciesMap['Animais de Criação']
-                            ],
-                            backgroundColor: ['#6BD425', '#618B25', '#42113C', '#370926'],
-                            borderRadius: 6
+                            data: [speciesCount.Cão, speciesCount.Gato, speciesCount.Ave, speciesCount.Outros],
+                            backgroundColor: ['#6BD425', '#618B25', '#42113C', '#2d0728'],
+                            borderWidth: 0
                         }]
                     },
                     options: {
-                        indexAxis: 'y',
                         responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            x: {
-                                beginAtZero: true,
-                                ticks: { precision: 0 }
-                            }
-                        }
+                        plugins: { legend: { position: 'bottom', labels: { color: '#cbd5e1' } } }
                     }
                 });
-            }
-        }
-
-        function renderAdminTable() {
-            const tbody = document.getElementById('admin-table-body');
-            if (!tbody) return;
-            tbody.innerHTML = '';
-
-            petsData.forEach(pet => {
-                const tr = document.createElement('tr');
-                tr.className = 'hover:bg-[#370926]/30 transition';
-
-                tr.innerHTML = `
-                    <td class="p-4 font-mono text-xs font-bold text-slate-200">${pet.id}</td>
-                    <td class="p-4">
-                        <span class="px-2.5 py-1 text-[10px] font-bold rounded-full ${pet.category === 'PERDI' ? 'bg-[#42113C] text-[#6BD425] border border-[#6BD425]/30' : 'bg-[#618B25] text-white'}">
-                            ${pet.category}
-                        </span>
-                    </td>
-                    <td class="p-4 font-semibold text-slate-100">${pet.name} <span class="text-xs text-slate-400 font-normal">(${pet.species})</span></td>
-                    <td class="p-4 text-xs">${pet.date}<br><span class="text-slate-400">${pet.address}</span></td>
-                    <td class="p-4 text-xs">${pet.reporterName}<br><span class="text-slate-400">${pet.contact}</span></td>
-                    <td class="p-4">
-                        <select onchange="changePetStatus('${pet.id}', this.value)" class="text-xs border border-[#42113C] rounded-lg px-2 py-1 bg-[#1C0118] text-slate-200 outline-none focus:ring-1 focus:ring-[#6BD425]">
-                            <option value="Em Busca" ${pet.status === 'Em Busca' ? 'selected' : ''}>Em Busca</option>
-                            <option value="Aguardando Tutor" ${pet.status === 'Aguardando Tutor' ? 'selected' : ''}>Aguardando Tutor</option>
-                            <option value="Reencontrado" ${pet.status === 'Reencontrado' ? 'selected' : ''}>Reencontrado</option>
-                        </select>
-                    </td>
-                    <td class="p-4 text-right">
-                        <button onclick="deletePet('${pet.id}')" class="text-rose-400 hover:text-rose-300 p-1.5 rounded-lg hover:bg-rose-950/50" title="Excluir Ocorrência">
-                            <i class="fa-solid fa-trash-can"></i>
-                        </button>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        function changePetStatus(id, newStatus) {
-            const pet = petsData.find(p => p.id === id);
-            if (pet) {
-                pet.status = newStatus;
-                renderAdminDashboard();
-                applyFilters();
-                showGlobalAlert(`Status da ocorrência ${id} atualizado para "${newStatus}".`, 'success');
             }
         }
 
@@ -796,577 +899,604 @@
             petsData = petsData.filter(p => p.id !== id);
             renderAdminDashboard();
             applyFilters();
-            showGlobalAlert(`Ocorrência ${id} removida com sucesso.`, 'info');
+            showGlobalAlert('Caso excluído com sucesso.', 'success');
         }
 
-        function exportDataCSV() {
-            let csvContent = "data:text/csv;charset=utf-8,Protocolo,Categoria,Nome,Especie,Raca,Data,Endereco,Contato,Status\n";
-            petsData.forEach(p => {
-                csvContent += `${p.id},${p.category},"${p.name}",${p.species},"${p.breed}",${p.date},"${p.address}","${p.contact}",${p.status}\n`;
-            });
+        function showGlobalAlert(message, type = 'success') {
+            const alertBox = document.getElementById('global-alert');
+            const alertText = document.getElementById('global-alert-text');
+            if (!alertBox || !alertText) return;
 
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", `auchou_export_${new Date().toISOString().slice(0,10)}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-
-        function showGlobalAlert(msg, type = 'info') {
-            const banner = document.getElementById('global-alert');
-            const icon = document.getElementById('global-alert-icon');
-            const msgEl = document.getElementById('global-alert-msg');
-            if (!banner || !icon || !msgEl) return;
-
-            msgEl.textContent = msg;
-            banner.className = 'mb-4 p-4 rounded-xl border shadow-sm transition-all duration-300 flex items-center justify-between ';
-
+            alertText.textContent = message;
+            alertBox.classList.remove('hidden', 'bg-[#6BD425]', 'bg-red-600');
             if (type === 'success') {
-                banner.className += 'bg-[#370926] border-[#6BD425]/50 text-[#6BD425]';
-                icon.className = 'fa-solid fa-circle-check text-[#6BD425] text-xl';
-            } else if (type === 'error') {
-                banner.className += 'bg-[#370926] border-rose-500/50 text-rose-300';
-                icon.className = 'fa-solid fa-triangle-exclamation text-rose-400 text-xl';
+                alertBox.classList.add('bg-[#618B25]', 'text-white');
             } else {
-                banner.className += 'bg-[#370926] border-[#618B25]/50 text-emerald-200';
-                icon.className = 'fa-solid fa-circle-info text-[#6BD425] text-xl';
+                alertBox.classList.add('bg-red-700', 'text-white');
             }
 
-            banner.classList.remove('hidden');
-            setTimeout(() => closeGlobalAlert(), 6000);
+            setTimeout(() => {
+                alertBox.classList.add('hidden');
+            }, 4000);
         }
 
-        function closeGlobalAlert() {
-            const banner = document.getElementById('global-alert');
-            if (banner) banner.classList.add('hidden');
-        }
-
-        window.onload = function () {
-            updateUserUI();
+        window.onload = function() {
             applyFilters();
+            updateUserUI();
         };
     </script>
 </head>
-<body class="h-full flex flex-col text-slate-100 antialiased selection:bg-[#6BD425] selection:text-slate-950">
+<body class="h-full flex flex-col bg-slate-950 text-slate-100">
 
-    <!-- Authentication Initial Overlay -->
-    <div id="auth-screen" class="fixed inset-0 z-50 bg-slate-950/95 flex items-center justify-center p-4">
-        <div class="bg-[#1C0118] border border-[#370926] rounded-3xl p-8 max-w-md w-full shadow-2xl space-y-6">
+    <!-- Global Floating Alert Box -->
+    <div id="global-alert" class="hidden fixed top-5 right-5 z-50 px-5 py-3 rounded-xl shadow-lg text-sm font-semibold flex items-center gap-3 transition transform duration-300">
+        <i class="fa-solid fa-circle-info"></i>
+        <span id="global-alert-text">Alerta do sistema</span>
+    </div>
+
+    <!-- AUTHENTICATION SCREEN (Overlay) -->
+    <div id="auth-screen" class="fixed inset-0 z-50 bg-slate-950 flex items-center justify-center p-4">
+        <div class="bg-[#1C0118] border border-[#370926] rounded-3xl shadow-2xl max-w-md w-full p-8 space-y-6">
             <div class="text-center space-y-2">
-                <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#370926] text-[#6BD425] text-2xl border border-[#42113C] mb-2 shadow-inner">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#370926] border border-[#6BD425]/40 text-[#6BD425] text-2xl mb-2 shadow-inner">
                     <i class="fa-solid fa-paw"></i>
                 </div>
-                <h1 class="text-2xl font-bold text-white tracking-tight">AuChou: CadêMeuPet?</h1>
-                <p class="text-xs text-slate-400">Faça login para acessar o sistema ou cadastre-se</p>
+                <h1 class="text-2xl font-bold tracking-tight text-white">AuChou: CadêMeuPet?</h1>
+                <p class="text-xs text-slate-400">Faça login para gerenciar casos e conversar com tutores.</p>
             </div>
 
-            <div id="login-error" class="hidden p-3 rounded-xl bg-[#370926] border border-rose-500/50 text-rose-300 text-xs text-center font-medium"></div>
+            <div id="login-error" class="hidden bg-red-950/80 border border-red-800 text-red-200 text-xs px-4 py-3 rounded-xl"></div>
 
             <form onsubmit="handleLogin(event)" class="space-y-4">
                 <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">E-mail</label>
-                    <input type="email" id="login-email" required value="admin@auchou.com" placeholder="seu@email.com" class="w-full text-xs bg-[#370926] border border-[#42113C] rounded-xl p-3 text-slate-200 outline-none focus:ring-1 focus:ring-[#6BD425]">
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">E-mail de Acesso</label>
+                    <input type="email" id="login-email" required placeholder="seu@email.com" class="w-full bg-[#370926] border border-[#42113C] text-slate-100 placeholder-slate-400 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#6BD425]">
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Senha</label>
-                    <input type="password" id="login-password" required value="Admin123!" placeholder="••••••••" class="w-full text-xs bg-[#370926] border border-[#42113C] rounded-xl p-3 text-slate-200 outline-none focus:ring-1 focus:ring-[#6BD425]">
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Senha</label>
+                    <input type="password" id="login-password" required placeholder="••••••••" class="w-full bg-[#370926] border border-[#42113C] text-slate-100 placeholder-slate-400 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#6BD425]">
                 </div>
-
-                <div class="pt-2">
-                    <button type="submit" class="w-full bg-[#6BD425] hover:bg-[#58b21e] text-slate-950 font-bold py-3 rounded-xl transition shadow-lg text-xs uppercase tracking-wider">
-                        Entrar no Sistema
-                    </button>
-                </div>
+                <button type="submit" class="w-full bg-[#6BD425] hover:bg-[#58b21e] text-slate-950 font-bold py-3.5 rounded-xl transition shadow-md text-sm">
+                    Entrar na Plataforma
+                </button>
             </form>
 
             <div class="pt-4 border-t border-[#370926] text-center space-y-3">
-                <p class="text-xs text-slate-400">Ainda não tem uma conta?</p>
-                <button type="button" onclick="openRegisterAccountModal()" class="w-full bg-[#370926] hover:bg-[#42113C] text-[#6BD425] font-bold py-2.5 rounded-xl transition border border-[#6BD425]/30 text-xs">
-                    Cadastrar-se Agora
+                <p class="text-xs text-slate-400">Ainda não possui uma conta?</p>
+                <button onclick="openRegisterAccountModal()" class="w-full bg-[#370926] hover:bg-[#42113C] text-[#6BD425] border border-[#6BD425]/30 font-semibold py-3 rounded-xl transition text-xs">
+                    Cadastrar Nova Conta de Tutor
                 </button>
-                <div class="text-[11px] text-slate-500 mt-2">
-                    Acesso Administrador Padrão: <strong class="text-slate-300">admin@auchou.com</strong> / <strong class="text-slate-300">Admin123!</strong>
-                </div>
+                <p class="text-[11px] text-slate-500 mt-2">Conta Admin padrão: <code class="text-[#6BD425]">admin@auchou.com</code> / <code class="text-[#6BD425]">Admin123!</code></p>
             </div>
         </div>
     </div>
 
-    <!-- Modal: Cadastrar-se (Sign Up) -->
-    <div id="modal-register-account" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-[#1C0118] border border-[#370926] rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto custom-scrollbar">
-            <div class="flex justify-between items-center border-b border-[#370926] pb-4">
-                <div>
-                    <h3 class="font-bold text-lg text-white">Criar Nova Conta</h3>
-                    <p class="text-xs text-slate-400">Preencha os dados abaixo para se cadastrar</p>
-                </div>
-                <button onclick="closeRegisterAccountModal()" class="text-slate-400 hover:text-white p-2">
-                    <i class="fa-solid fa-xmark text-lg"></i>
-                </button>
-            </div>
-
-            <div id="reg-acc-error" class="hidden p-3 rounded-xl bg-[#370926] border border-rose-500/50 text-rose-300 text-xs text-center font-medium"></div>
-
-            <form id="form-register-account" onsubmit="handleCreateAccount(event)" class="space-y-4">
-                <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Nome Completo</label>
-                    <input type="text" id="reg-acc-name" required placeholder="Seu Nome Completo" class="w-full text-xs bg-[#370926] border border-[#42113C] rounded-xl p-3 text-slate-200 outline-none focus:ring-1 focus:ring-[#6BD425]">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">E-mail</label>
-                    <input type="email" id="reg-acc-email" required placeholder="seu@email.com" class="w-full text-xs bg-[#370926] border border-[#42113C] rounded-xl p-3 text-slate-200 outline-none focus:ring-1 focus:ring-[#6BD425]">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Senha <span class="text-[10px] text-[#6BD425] font-normal">(Mín. 8 dígitos, 1 letra maiúscula, 1 número)</span></label>
-                    <input type="password" id="reg-acc-password" required placeholder="••••••••" class="w-full text-xs bg-[#370926] border border-[#42113C] rounded-xl p-3 text-slate-200 outline-none focus:ring-1 focus:ring-[#6BD425]">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Telefone / WhatsApp</label>
-                    <input type="text" id="reg-acc-phone" required placeholder="(15) 99999-9999" class="w-full text-xs bg-[#370926] border border-[#42113C] rounded-xl p-3 text-slate-200 outline-none focus:ring-1 focus:ring-[#6BD425]">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Cidade</label>
-                    <input type="text" id="reg-acc-city" required placeholder="Ex: Itapetininga - SP" class="w-full text-xs bg-[#370926] border border-[#42113C] rounded-xl p-3 text-slate-200 outline-none focus:ring-1 focus:ring-[#6BD425]">
-                </div>
-
-                <div class="pt-2 flex gap-3">
-                    <button type="button" onclick="closeRegisterAccountModal()" class="flex-1 bg-[#370926] hover:bg-[#42113C] text-slate-300 font-medium py-3 rounded-xl transition text-xs">Cancelar</button>
-                    <button type="submit" class="flex-1 bg-[#6BD425] hover:bg-[#58b21e] text-slate-950 font-bold py-3 rounded-xl transition text-xs shadow-md">Salvar Cadastro</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Header Navigation Bar -->
-    <header class="glass-header sticky top-0 z-40 border-b border-[#370926]">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <!-- HEADER / NAVBAR -->
+    <header class="glass-header border-b border-[#370926] sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-[#370926] border border-[#42113C] flex items-center justify-center text-[#6BD425]">
-                    <i class="fa-solid fa-paw text-lg"></i>
+                <div class="w-12 h-12 rounded-2xl bg-[#370926] border border-[#6BD425]/40 flex items-center justify-center text-[#6BD425] text-xl shadow-md">
+                    <i class="fa-solid fa-paw"></i>
                 </div>
                 <div>
-                    <span class="font-bold text-base text-white tracking-tight">AuChou</span>
-                    <span class="text-[10px] block text-[#6BD425] font-semibold uppercase tracking-wider">Cadê Meu Pet?</span>
+                    <span class="font-bold text-lg text-white tracking-tight flex items-center gap-2">
+                        AuChou <span class="text-xs bg-[#42113C] border border-[#6BD425]/40 text-[#6BD425] px-2 py-0.5 rounded-full font-mono">CadêMeuPet?</span>
+                    </span>
+                    <p class="text-xs text-slate-400">Rede Colaborativa de Busca e Reencontro</p>
                 </div>
             </div>
 
-            <!-- Desktop Navigation -->
-            <nav class="hidden md:flex items-center gap-1">
-                <button onclick="switchTab('map-view')" data-tab="map-view" class="nav-btn active bg-[#370926] text-[#6BD425] px-4 py-2 rounded-xl text-xs font-medium transition flex items-center gap-2">
-                    <i class="fa-solid fa-map-location-dot"></i> Mapa de Ocorrências
+            <!-- Navigation Tabs (Desktop) -->
+            <nav class="hidden md:flex items-center gap-1.5 bg-[#1C0118] border border-[#370926] p-1.5 rounded-2xl shadow-inner">
+                <button onclick="switchTab('list-view')" data-tab="list-view" class="nav-btn active bg-[#370926] text-[#6BD425] px-3.5 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-2">
+                    <i class="fa-solid fa-globe"></i> Mural e Mapa
                 </button>
-                <button onclick="switchTab('list-view')" data-tab="list-view" class="nav-btn text-slate-300 hover:text-white hover:bg-[#370926]/50 px-4 py-2 rounded-xl text-xs font-medium transition flex items-center gap-2">
-                    <i class="fa-solid fa-list"></i> Lista de Casos
-                </button>
-                <button onclick="switchTab('messages-view')" data-tab="messages-view" class="nav-btn text-slate-300 hover:text-white hover:bg-[#370926]/50 px-4 py-2 rounded-xl text-xs font-medium transition flex items-center gap-2">
+                <button onclick="switchTab('messages-view')" data-tab="messages-view" class="nav-btn text-slate-300 hover:text-white px-3.5 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-2">
                     <i class="fa-solid fa-comments"></i> Mensagens
                 </button>
-                <button id="nav-admin-btn" onclick="switchTab('admin-view')" data-tab="admin-view" class="nav-btn text-slate-300 hover:text-white hover:bg-[#370926]/50 px-4 py-2 rounded-xl text-xs font-medium transition flex items-center gap-2">
-                    <i class="fa-solid fa-chart-pie"></i> Painel do Admin
+                <button onclick="switchTab('profile-view')" data-tab="profile-view" class="nav-btn text-slate-300 hover:text-white px-3.5 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-2">
+                    <i class="fa-solid fa-user-gear"></i> Meu Perfil
+                </button>
+                <button onclick="switchTab('admin-view')" data-tab="admin-view" id="nav-admin-btn" class="nav-btn text-slate-300 hover:text-white px-3.5 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-2 hidden">
+                    <i class="fa-solid fa-chart-pie"></i> Painel Admin
                 </button>
             </nav>
 
+            <!-- User Info & Action -->
             <div class="flex items-center gap-3">
-                <div class="hidden lg:flex flex-col text-right">
-                    <span id="user-display-name" class="text-xs font-bold text-slate-200">Visitante</span>
-                    <span id="user-display-role" class="text-[10px] text-[#6BD425]">Convidado</span>
+                <div class="hidden lg:flex items-center gap-3 text-right">
+                    <img id="user-display-avatar" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80" alt="Avatar" class="w-9 h-9 rounded-full object-cover border border-[#6BD425]/40">
+                    <div>
+                        <div id="user-display-name" class="font-bold text-xs text-white">Visitante</div>
+                        <div id="user-display-role" class="text-[10px] text-slate-400">Tutor</div>
+                    </div>
                 </div>
-                <button onclick="openRegisterModal()" class="bg-[#6BD425] hover:bg-[#58b21e] text-slate-950 font-bold px-4 py-2 rounded-xl text-xs transition shadow-sm flex items-center gap-2">
-                    <i class="fa-solid fa-plus-circle"></i> Registrar Ocorrência
+                <button onclick="openRegisterModal()" class="bg-[#6BD425] hover:bg-[#58b21e] text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs transition shadow-md flex items-center gap-2">
+                    <i class="fa-solid fa-plus"></i> Cadastrar Pet
                 </button>
-                <button onclick="handleLogout()" class="bg-[#370926] hover:bg-[#42113C] text-rose-300 border border-rose-500/30 px-3 py-2 rounded-xl text-xs font-medium transition" title="Sair / Trocar Usuário">
+                <button onclick="handleLogout()" class="bg-[#370926] hover:bg-red-900/60 text-red-300 border border-red-800/40 px-3 py-2.5 rounded-xl text-xs transition" title="Sair da Conta">
                     <i class="fa-solid fa-right-from-bracket"></i>
                 </button>
-                <button onclick="toggleMobileMenu()" class="md:hidden text-slate-300 hover:text-white p-2">
-                    <i class="fa-solid fa-bars text-lg"></i>
+                <button onclick="toggleMobileMenu()" class="md:hidden text-slate-300 p-2">
+                    <i class="fa-solid fa-bars text-xl"></i>
                 </button>
             </div>
         </div>
 
-        <!-- Mobile Menu Dropdown -->
-        <div id="mobile-menu" class="hidden md:hidden bg-[#1C0118] border-b border-[#370926] px-4 py-3 space-y-2">
-            <button onclick="switchTab('map-view'); toggleMobileMenu();" class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-slate-200 hover:bg-[#370926] flex items-center gap-2">
-                <i class="fa-solid fa-map-location-dot text-[#6BD425]"></i> Mapa de Ocorrências
-            </button>
-            <button onclick="switchTab('list-view'); toggleMobileMenu();" class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-slate-200 hover:bg-[#370926] flex items-center gap-2">
-                <i class="fa-solid fa-list text-[#6BD425]"></i> Lista de Casos
-            </button>
-            <button onclick="switchTab('messages-view'); toggleMobileMenu();" class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-slate-200 hover:bg-[#370926] flex items-center gap-2">
-                <i class="fa-solid fa-comments text-[#6BD425]"></i> Mensagens
-            </button>
-            <button onclick="switchTab('admin-view'); toggleMobileMenu();" class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-slate-200 hover:bg-[#370926] flex items-center gap-2">
-                <i class="fa-solid fa-chart-pie text-[#6BD425]"></i> Painel do Admin
-            </button>
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="hidden md:hidden bg-[#1C0118] border-b border-[#370926] px-4 py-4 space-y-2">
+            <button onclick="switchTab('list-view'); toggleMobileMenu();" class="w-full text-left px-4 py-2.5 rounded-xl text-xs font-semibold text-white bg-[#370926]">Mural e Mapa</button>
+            <button onclick="switchTab('messages-view'); toggleMobileMenu();" class="w-full text-left px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-300">Mensagens</button>
+            <button onclick="switchTab('profile-view'); toggleMobileMenu();" class="w-full text-left px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-300">Meu Perfil</button>
+            <button onclick="switchTab('admin-view'); toggleMobileMenu();" class="w-full text-left px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-300">Painel Admin</button>
         </div>
     </header>
 
-    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col">
-        <div id="global-alert" class="hidden mb-4 p-4 rounded-xl border shadow-sm flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <i id="global-alert-icon" class="fa-solid fa-circle-info text-xl"></i>
-                <span id="global-alert-msg" class="text-xs font-medium">Mensagem do sistema</span>
-            </div>
-            <button onclick="closeGlobalAlert()" class="text-xs opacity-70 hover:opacity-100">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
-        </div>
+    <!-- MAIN APP CONTENT AREA -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
-        <!-- Tab 1: Map View -->
-        <div id="tab-map-view" class="tab-content flex-1 flex flex-col space-y-4">
-            <div class="bg-[#1C0118] border border-[#370926] rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4">
-                <div class="flex items-center gap-2">
-                    <span class="text-xs font-bold text-slate-300"><i class="fa-solid fa-filter text-[#6BD425] mr-1"></i> Filtros Rápidos:</span>
-                    <select id="filter-category" onchange="applyFilters()" class="text-xs bg-[#370926] border border-[#42113C] rounded-xl px-3 py-2 text-slate-200 outline-none focus:ring-1 focus:ring-[#6BD425]">
-                        <option value="ALL">Todas Categorias</option>
+        <!-- TAB 1: LIST & MAP VIEW -->
+        <div id="tab-list-view" class="tab-content space-y-6">
+            <!-- Filter Bar -->
+            <div class="bg-[#1C0118] border border-[#370926] p-4 rounded-2xl shadow-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                <div>
+                    <label class="block text-[10px] font-semibold text-slate-400 mb-1">Categoria</label>
+                    <select id="filter-category" onchange="applyFilters()" class="w-full bg-[#370926] border border-[#42113C] text-slate-200 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-[#6BD425]">
+                        <option value="ALL">Todas as Categorias</option>
                         <option value="PERDI">🔴 Perdi um Pet</option>
                         <option value="ACHEI">🔵 Achei um Pet</option>
                     </select>
-                    <select id="filter-species" onchange="applyFilters()" class="text-xs bg-[#370926] border border-[#42113C] rounded-xl px-3 py-2 text-slate-200 outline-none focus:ring-1 focus:ring-[#6BD425]">
-                        <option value="ALL">Todas Espécies</option>
-                        <option value="Cão">Cães</option>
-                        <option value="Gato">Gatos</option>
-                        <option value="Ave">Aves</option>
-                        <option value="Animais de Criação">Criação</option>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-semibold text-slate-400 mb-1">Espécie</label>
+                    <select id="filter-species" onchange="applyFilters()" class="w-full bg-[#370926] border border-[#42113C] text-slate-200 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-[#6BD425]">
+                        <option value="ALL">Todas as Espécies</option>
+                        <option value="Cão">Cão</option>
+                        <option value="Gato">Gato</option>
+                        <option value="Ave">Ave</option>
+                        <option value="Outros">Outros</option>
                     </select>
                 </div>
-                <div class="flex items-center gap-2">
-                    <button onclick="locateUserOnMap()" class="bg-[#370926] hover:bg-[#42113C] text-[#6BD425] border border-[#6BD425]/30 px-3.5 py-2 rounded-xl text-xs font-medium transition flex items-center gap-2">
-                        <i class="fa-solid fa-crosshairs"></i> Minha Localização GPS
-                    </button>
-                </div>
-            </div>
-
-            <div class="map-embed-container bg-[#1C0118] border border-[#370926] shadow-sm">
-                <!-- Embedded Map Simulator via Google Maps iframe -->
-                <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d58501.23456789!2d-48.0520!3d-23.5910!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMjPCsDM1JzI3LjYiUyA0OMKwMDMnMDcuMiJX!5e0!3m2!1spt-BR!2sbr!4v1650000000000!5m2!1spt-BR!2sbr" allowfullscreen="" loading="lazy"></iframe>
-            </div>
-        </div>
-
-        <!-- Tab 2: List View -->
-        <div id="tab-list-view" class="tab-content hidden flex-1 flex flex-col space-y-4">
-            <div class="bg-[#1C0118] border border-[#370926] rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4">
-                <div class="flex-1 min-w-[240px]">
-                    <div class="relative">
-                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 text-xs"></i>
-                        <input type="text" id="filter-search" oninput="applyFilters()" placeholder="Pesquisar por nome, raça, endereço ou protocolo..." class="w-full text-xs bg-[#370926] border border-[#42113C] rounded-xl pl-10 pr-4 py-2.5 text-slate-200 outline-none focus:ring-1 focus:ring-[#6BD425]">
-                    </div>
-                </div>
-                <div class="flex items-center gap-2">
-                    <select id="filter-status" onchange="applyFilters()" class="text-xs bg-[#370926] border border-[#42113C] rounded-xl px-3 py-2 text-slate-200 outline-none focus:ring-1 focus:ring-[#6BD425]">
+                <div>
+                    <label class="block text-[10px] font-semibold text-slate-400 mb-1">Status</label>
+                    <select id="filter-status" onchange="applyFilters()" class="w-full bg-[#370926] border border-[#42113C] text-slate-200 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-[#6BD425]">
                         <option value="ALL">Todos os Status</option>
                         <option value="Em Busca">Em Busca</option>
                         <option value="Aguardando Tutor">Aguardando Tutor</option>
                         <option value="Reencontrado">Reencontrado</option>
                     </select>
                 </div>
-            </div>
-
-            <div id="cases-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                <!-- Cases dynamically populated here -->
-            </div>
-
-            <div id="empty-state" class="hidden text-center py-16 bg-[#1C0118] border border-[#370926] rounded-2xl">
-                <div class="w-16 h-16 rounded-2xl bg-[#370926] flex items-center justify-center mx-auto text-[#6BD425] text-2xl mb-3 border border-[#42113C]">
-                    <i class="fa-solid fa-box-open"></i>
+                <div class="sm:col-span-2">
+                    <label class="block text-[10px] font-semibold text-slate-400 mb-1">Busca por Palavra-chave</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="filter-search" oninput="applyFilters()" placeholder="Nome, raça, endereço ou protocolo..." class="w-full bg-[#370926] border border-[#42113C] text-slate-200 placeholder-slate-400 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-[#6BD425]">
+                        <button onclick="locateUserOnMap()" class="bg-[#370926] hover:bg-[#42113C] text-[#6BD425] border border-[#6BD425]/30 px-3.5 py-2.5 rounded-xl text-xs transition" title="Obter minha localização GPS">
+                            <i class="fa-solid fa-location-crosshairs"></i>
+                        </button>
+                    </div>
                 </div>
-                <h3 class="font-bold text-slate-200 text-base">Nenhum pet encontrado</h3>
-                <p class="text-xs text-slate-400 mt-1">Tente ajustar os filtros de busca para encontrar ocorrências.</p>
+            </div>
+
+            <!-- Content Grid (Cards & Map Layout) -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Left 2 Cols: Cards Grid -->
+                <div class="lg:col-span-2 space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h2 class="font-bold text-sm text-slate-300 uppercase tracking-wider">Casos Cadastrados</h2>
+                        <span class="text-xs text-slate-400">Exibindo ocorrências em tempo real</span>
+                    </div>
+
+                    <div id="cases-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <!-- Dynamic Cards injected here -->
+                    </div>
+
+                    <!-- Empty state -->
+                    <div id="empty-state" class="hidden bg-[#1C0118] border border-[#370926] rounded-2xl p-12 text-center space-y-3">
+                        <i class="fa-solid fa-shield-cat text-4xl text-[#6BD425]/40"></i>
+                        <h3 class="font-bold text-white text-base">Nenhum pet encontrado</h3>
+                        <p class="text-xs text-slate-400 max-w-sm mx-auto">Tente ajustar seus filtros de busca ou cadastre um novo caso para ajudar a comunidade.</p>
+                    </div>
+                </div>
+
+                <!-- Right Col: Map Embed (Itapetininga / Localizador) -->
+                <div class="bg-[#1C0118] border border-[#370926] rounded-2xl p-4 flex flex-col">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-bold text-sm text-white flex items-center gap-2">
+                            <i class="fa-solid fa-map-location-dot text-[#6BD425]"></i> Radar Geográfico
+                        </h3>
+                        <span class="text-[10px] bg-[#370926] text-[#6BD425] px-2.5 py-0.5 rounded-full border border-[#6BD425]/30">Itapetininga - SP</span>
+                    </div>
+                    <div class="map-embed-container flex-1">
+                        <iframe src="https://www.openstreetmap.org/export/embed.html?bbox=-48.075%2C-23.615%2C-48.030%2C-23.570&amp;layer=mapnik" style="border: 0;"></iframe>
+                    </div>
+                    <p class="text-[11px] text-slate-500 text-center mt-3">Clique em um marcador no mural para ver detalhes completos da ocorrência.</p>
+                </div>
             </div>
         </div>
 
-        <!-- Tab 3: Messages View -->
-        <div id="tab-messages-view" class="tab-content hidden flex-1 grid grid-cols-1 md:grid-cols-3 gap-5 h-[calc(100vh-14rem)]">
-            <div class="bg-[#1C0118] border border-[#370926] rounded-2xl p-4 flex flex-col space-y-3 overflow-hidden">
-                <h3 class="font-bold text-xs text-slate-300 uppercase tracking-wider px-1">Conversas de Ocorrências</h3>
-                <div id="chat-threads-list" class="flex-1 overflow-y-auto space-y-2.5 custom-scrollbar pr-1">
-                    <!-- Chat threads populated here -->
+        <!-- TAB 2: MESSAGES VIEW -->
+        <div id="tab-messages-view" class="tab-content hidden space-y-6 h-[calc(100vh-140px)]">
+            <div class="bg-[#1C0118] border border-[#370926] rounded-2xl shadow-sm h-full grid grid-cols-1 md:grid-cols-3 overflow-hidden">
+                <!-- Threads Sidebar -->
+                <div class="border-r border-[#370926] flex flex-col h-full bg-[#1C0118]/60">
+                    <div class="p-4 border-b border-[#370926]">
+                        <h3 class="font-bold text-sm text-white flex items-center gap-2">
+                            <i class="fa-solid fa-comments text-[#6BD425]"></i> Conversas Ativas
+                        </h3>
+                        <p class="text-xs text-slate-400 mt-0.5">Mensagens trocadas com tutores</p>
+                    </div>
+                    <div id="chat-threads-list" class="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2">
+                        <!-- Threads populated here -->
+                    </div>
+                </div>
+
+                <!-- Chat Box Area -->
+                <div id="active-chat-area" class="md:col-span-2 flex flex-col h-full bg-[#1C0118]">
+                    <div class="flex-1 flex items-center justify-center text-slate-500 text-sm">
+                        Selecione uma conversa ao lado para iniciar o bate-papo.
+                    </div>
                 </div>
             </div>
+        </div>
 
-            <div class="md:col-span-2 bg-[#1C0118] border border-[#370926] rounded-2xl flex flex-col overflow-hidden">
-                <div id="chat-empty-view" class="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400">
-                    <i class="fa-regular fa-comments text-4xl text-slate-600 mb-3"></i>
-                    <h3 class="font-bold text-slate-300 text-sm">Selecione uma conversa ao lado</h3>
-                    <p class="text-xs text-slate-500 mt-1">Converse com tutores ou descobridores de pets perdidos de forma segura.</p>
-                </div>
+        <!-- TAB 3: PROFILE VIEW -->
+        <div id="tab-profile-view" class="tab-content hidden space-y-8">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Left: Edit Profile & Avatar -->
+                <div class="bg-[#1C0118] border border-[#370926] rounded-2xl p-6 shadow-sm space-y-6">
+                    <div class="text-center space-y-3">
+                        <div class="relative w-24 h-24 mx-auto rounded-full overflow-hidden border-2 border-[#6BD425] shadow-md bg-[#370926]">
+                            <img id="profile-avatar-preview" src="" alt="Avatar" class="w-full h-full object-cover">
+                        </div>
+                        <h3 class="font-bold text-base text-white">Configurações de Perfil</h3>
+                        <p class="text-xs text-slate-400">Atualize sua foto, dados de contato e cidade.</p>
+                    </div>
 
-                <div id="chat-active-view" class="hidden flex-1 flex flex-col h-full">
-                    <div class="p-4 bg-[#370926]/40 border-b border-[#370926] flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <div id="chat-header-avatar" class="w-10 h-10 rounded-xl bg-[#6BD425] text-slate-950 font-bold flex items-center justify-center text-sm shadow-sm">P</div>
+                    <form onsubmit="updateProfile(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">Foto de Perfil (URL da Imagem)</label>
+                            <input type="url" id="profile-avatar" placeholder="https://exemplo.com/avatar.jpg" class="w-full bg-[#370926] border border-[#42113C] text-slate-100 placeholder-slate-400 text-xs rounded-xl px-4 py-3 focus:outline-none focus:border-[#6BD425]">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">Nome Completo</label>
+                            <input type="text" id="profile-name" required class="w-full bg-[#370926] border border-[#42113C] text-slate-100 text-xs rounded-xl px-4 py-3 focus:outline-none focus:border-[#6BD425]">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-300 mb-1">E-mail (Não alterável)</label>
+                            <input type="email" id="profile-email" disabled class="w-full bg-[#370926]/40 border border-[#42113C] text-slate-400 text-xs rounded-xl px-4 py-3 cursor-not-allowed">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <h3 id="chat-header-title" class="font-bold text-xs text-white">Nome do Pet</h3>
-                                <p id="chat-header-protocol" class="text-[10px] text-slate-400">Protocolo: PRT-00000</p>
+                                <label class="block text-xs font-semibold text-slate-300 mb-1">Telefone</label>
+                                <input type="text" id="profile-phone" required class="w-full bg-[#370926] border border-[#42113C] text-slate-100 text-xs rounded-xl px-4 py-3 focus:outline-none focus:border-[#6BD425]">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-300 mb-1">Cidade</label>
+                                <input type="text" id="profile-city" required class="w-full bg-[#370926] border border-[#42113C] text-slate-100 text-xs rounded-xl px-4 py-3 focus:outline-none focus:border-[#6BD425]">
                             </div>
                         </div>
-                        <span id="chat-header-badge" class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-[#42113C] text-[#6BD425] border border-[#6BD425]/30">PET PERDIDO</span>
-                    </div>
-
-                    <div id="chat-messages-body" class="flex-1 p-4 overflow-y-auto space-y-3 custom-scrollbar">
-                        <!-- Messages populated here -->
-                    </div>
-
-                    <form onsubmit="sendChatMessage(event)" class="p-3 bg-[#370926]/20 border-t border-[#370926] flex gap-2">
-                        <input type="text" id="chat-input-text" required placeholder="Digite sua mensagem..." class="flex-1 text-xs bg-[#370926] border border-[#42113C] rounded-xl px-4 py-3 text-slate-200 outline-none focus:ring-1 focus:ring-[#6BD425]">
-                        <button type="submit" class="bg-[#6BD425] hover:bg-[#58b21e] text-slate-950 font-bold px-5 py-3 rounded-xl transition text-xs shadow-sm">
-                            <i class="fa-solid fa-paper-plane"></i>
+                        <button type="submit" class="w-full bg-[#6BD425] hover:bg-[#58b21e] text-slate-950 font-bold py-3 rounded-xl transition text-xs shadow-md">
+                            Salvar Alterações do Perfil
                         </button>
                     </form>
                 </div>
+
+                <!-- Right: My Registered Pets & Listings Management -->
+                <div class="lg:col-span-2 space-y-4">
+                    <div class="bg-[#1C0118] border border-[#370926] rounded-2xl p-6 shadow-sm space-y-4">
+                        <div class="flex justify-between items-center pb-3 border-b border-[#370926]">
+                            <div>
+                                <h3 class="font-bold text-sm text-white flex items-center gap-2">
+                                    <i class="fa-solid fa-paw text-[#6BD425]"></i> Meus Animais Registrados
+                                </h3>
+                                <p class="text-xs text-slate-400">Gerencie, edite ou altere o status das ocorrências cadastradas por você.</p>
+                            </div>
+                            <span class="text-xs bg-[#370926] text-[#6BD425] px-3 py-1 rounded-full border border-[#6BD425]/30 font-bold">Meus Registros</span>
+                        </div>
+
+                        <div id="my-pets-list" class="space-y-3">
+                            <!-- Injected dynamically -->
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- Tab 4: Admin View -->
-        <div id="tab-admin-view" class="tab-content hidden flex-1 flex flex-col space-y-6">
-            <div class="flex justify-between items-center bg-[#1C0118] border border-[#370926] rounded-2xl p-5">
-                <div>
-                    <h2 class="font-bold text-lg text-white">Painel Administrativo AuChou</h2>
-                    <p class="text-xs text-slate-400">Gerenciamento geral de ocorrências, estatísticas e relatórios</p>
-                </div>
-                <button onclick="exportDataCSV()" class="bg-[#6BD425] hover:bg-[#58b21e] text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs transition shadow-sm flex items-center gap-2">
-                    <i class="fa-solid fa-file-arrow-down"></i> Exportar CSV
-                </button>
-            </div>
-
-            <!-- Metrics Cards -->
+        <!-- TAB 4: ADMIN VIEW -->
+        <div id="tab-admin-view" class="tab-content hidden space-y-6">
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="bg-[#1C0118] border border-[#370926] rounded-2xl p-4 flex items-center justify-between">
-                    <div>
-                        <p class="text-xs text-slate-400">Total de Ocorrências</p>
-                        <h3 id="metric-total" class="text-2xl font-bold text-white mt-1">0</h3>
-                    </div>
-                    <div class="w-12 h-12 rounded-xl bg-[#370926] border border-[#42113C] flex items-center justify-center text-[#6BD425] text-lg">
-                        <i class="fa-solid fa-clipboard-list"></i>
-                    </div>
+                <div class="bg-[#1C0118] border border-[#370926] p-5 rounded-2xl shadow-sm">
+                    <p class="text-xs text-slate-400">Total de Ocorrências</p>
+                    <h3 id="stat-total" class="text-2xl font-extrabold text-white mt-1">0</h3>
                 </div>
-                <div class="bg-[#1C0118] border border-[#370926] rounded-2xl p-4 flex items-center justify-between">
-                    <div>
-                        <p class="text-xs text-slate-400">Pets Perdidos</p>
-                        <h3 id="metric-lost" class="text-2xl font-bold text-rose-400 mt-1">0</h3>
-                    </div>
-                    <div class="w-12 h-12 rounded-xl bg-[#370926] border border-[#42113C] flex items-center justify-center text-rose-400 text-lg">
-                        <i class="fa-solid fa-triangle-exclamation"></i>
-                    </div>
+                <div class="bg-[#1C0118] border border-[#370926] p-5 rounded-2xl shadow-sm">
+                    <p class="text-xs text-slate-400">Pets Perdidos</p>
+                    <h3 id="stat-lost" class="text-2xl font-extrabold text-red-400 mt-1">0</h3>
                 </div>
-                <div class="bg-[#1C0118] border border-[#370926] rounded-2xl p-4 flex items-center justify-between">
-                    <div>
-                        <p class="text-xs text-slate-400">Pets Encontrados</p>
-                        <h3 id="metric-found" class="text-2xl font-bold text-[#6BD425] mt-1">0</h3>
-                    </div>
-                    <div class="w-12 h-12 rounded-xl bg-[#370926] border border-[#42113C] flex items-center justify-center text-[#6BD425] text-lg">
-                        <i class="fa-solid fa-shield-cat"></i>
-                    </div>
+                <div class="bg-[#1C0118] border border-[#370926] p-5 rounded-2xl shadow-sm">
+                    <p class="text-xs text-slate-400">Pets Encontrados</p>
+                    <h3 id="stat-found" class="text-2xl font-extrabold text-[#6BD425] mt-1">0</h3>
                 </div>
-                <div class="bg-[#1C0118] border border-[#370926] rounded-2xl p-4 flex items-center justify-between">
-                    <div>
-                        <p class="text-xs text-slate-400">Casos Resolvidos</p>
-                        <h3 id="metric-resolved" class="text-2xl font-bold text-emerald-400 mt-1">0</h3>
-                    </div>
-                    <div class="w-12 h-12 rounded-xl bg-[#370926] border border-[#42113C] flex items-center justify-center text-emerald-400 text-lg">
-                        <i class="fa-solid fa-circle-check"></i>
-                    </div>
+                <div class="bg-[#1C0118] border border-[#370926] p-5 rounded-2xl shadow-sm">
+                    <p class="text-xs text-slate-400">Casos Resolvidos</p>
+                    <h3 id="stat-resolved" class="text-2xl font-extrabold text-emerald-400 mt-1">0</h3>
                 </div>
             </div>
 
-            <!-- Charts Section -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                <div class="bg-[#1C0118] border border-[#370926] rounded-2xl p-5">
-                    <h3 class="font-bold text-sm text-white mb-4">Distribuição por Espécie (Doughnut)</h3>
-                    <div class="h-64 relative">
-                        <canvas id="chart-species"></canvas>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Table of cases -->
+                <div class="lg:col-span-2 bg-[#1C0118] border border-[#370926] rounded-2xl p-6 shadow-sm overflow-hidden flex flex-col">
+                    <h3 class="font-bold text-sm text-white mb-4">Gerenciamento Geral de Cadastros</h3>
+                    <div class="overflow-x-auto flex-1">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-[#370926] text-slate-300 uppercase tracking-wider text-[10px]">
+                                <tr>
+                                    <th class="px-4 py-3 rounded-l-xl">Protocolo</th>
+                                    <th class="px-4 py-3">Nome</th>
+                                    <th class="px-4 py-3">Espécie</th>
+                                    <th class="px-4 py-3">Status</th>
+                                    <th class="px-4 py-3 rounded-r-xl text-right">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-table-body" class="divide-y divide-[#370926]">
+                                <!-- Admin rows populated here -->
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-                <div class="bg-[#1C0118] border border-[#370926] rounded-2xl p-5">
-                    <h3 class="font-bold text-sm text-white mb-4">Estatísticas de Ocorrências por Espécie</h3>
-                    <div class="h-64 relative">
-                        <canvas id="chart-species-horizontal"></canvas>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Management Table -->
-            <div class="bg-[#1C0118] border border-[#370926] rounded-2xl overflow-hidden">
-                <div class="p-4 border-b border-[#370926]">
-                    <h3 class="font-bold text-sm text-white">Gerenciamento Geral de Registros</h3>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="bg-[#370926]/40 text-[11px] text-slate-300 uppercase font-bold tracking-wider border-b border-[#370926]">
-                                <th class="p-4">Protocolo</th>
-                                <th class="p-4">Tipo</th>
-                                <th class="p-4">Pet / Espécie</th>
-                                <th class="p-4">Data / Local</th>
-                                <th class="p-4">Tutor / Contato</th>
-                                <th class="p-4">Status</th>
-                                <th class="p-4 text-right">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody id="admin-table-body" class="divide-y divide-[#370926]">
-                            <!-- Rows populated dynamically -->
-                        </tbody>
-                    </table>
+                <!-- Chart Box -->
+                <div class="bg-[#1C0118] border border-[#370926] rounded-2xl p-6 shadow-sm flex flex-col items-center justify-center">
+                    <h3 class="font-bold text-sm text-white mb-4 w-full text-left">Distribuição por Espécie</h3>
+                    <div class="w-full max-w-[260px] my-auto">
+                        <canvas id="chartSpecies"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
+
     </main>
 
-    <!-- Modal: Detalhes do Pet -->
-    <div id="modal-details" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-[#1C0118] border border-[#370926] rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-            <div id="modal-details-header" class="p-6 text-white flex justify-between items-start bg-gradient-to-r from-[#42113C] to-[#370926]">
+    <!-- MODAL: EDIT PET RECORD -->
+    <div id="modal-edit-pet" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-[#1C0118] border border-[#370926] rounded-3xl shadow-2xl max-w-lg w-full p-8 space-y-6 my-8">
+            <div class="flex justify-between items-center">
                 <div>
-                    <span id="detail-category-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-[#1C0118]/80 text-[#6BD425] border border-[#6BD425]/30">🔴 PERDI UM PET</span>
-                    <h2 id="detail-pet-name" class="text-2xl font-bold mt-2">Nome do Pet</h2>
-                    <p id="detail-species-breed" class="text-xs text-slate-300 mt-0.5">Espécie • Raça</p>
+                    <h3 class="font-bold text-lg text-white">Editar Registro de Pet</h3>
+                    <p class="text-xs text-slate-400">Atualize as informações ou altere o status do animal.</p>
                 </div>
-                <button onclick="closeDetailsModal()" class="text-slate-300 hover:text-white p-2">
-                    <i class="fa-solid fa-xmark text-xl"></i>
+                <button onclick="closeEditPetModal()" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
                 </button>
             </div>
 
-            <div class="p-6 overflow-y-auto space-y-5 custom-scrollbar flex-1">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <form onsubmit="handleEditPetSubmit(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Nome do Pet</label>
+                    <input type="text" id="edit-pet-name" required class="w-full bg-[#370926] border border-[#42113C] text-slate-100 text-xs rounded-xl px-4 py-3 focus:outline-none focus:border-[#6BD425]">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <img id="detail-image" src="" alt="Pet" class="w-full h-64 object-cover rounded-2xl border border-[#370926]" onerror="this.src='https://placehold.co/400x300/370926/ffffff?text=Sem+Foto'">
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Raça</label>
+                        <input type="text" id="edit-pet-breed" class="w-full bg-[#370926] border border-[#42113C] text-slate-100 text-xs rounded-xl px-4 py-3 focus:outline-none focus:border-[#6BD425]">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Cor</label>
+                        <input type="text" id="edit-pet-color" required class="w-full bg-[#370926] border border-[#42113C] text-slate-100 text-xs rounded-xl px-4 py-3 focus:outline-none focus:border-[#6BD425]">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Status do Caso</label>
+                        <select id="edit-pet-status" class="w-full bg-[#370926] border border-[#42113C] text-slate-200 text-xs rounded-xl px-3 py-3 focus:outline-none focus:border-[#6BD425]">
+                            <option value="Em Busca">Em Busca</option>
+                            <option value="Aguardando Tutor">Aguardando Tutor</option>
+                            <option value="Reencontrado">Reencontrado (Resolvido)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Recompensa</label>
+                        <input type="text" id="edit-pet-reward" class="w-full bg-[#370926] border border-[#42113C] text-slate-100 text-xs rounded-xl px-4 py-3 focus:outline-none focus:border-[#6BD425]">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Descrição</label>
+                    <textarea id="edit-pet-description" rows="3" class="w-full bg-[#370926] border border-[#42113C] text-slate-100 text-xs rounded-xl px-4 py-3 focus:outline-none focus:border-[#6BD425]"></textarea>
+                </div>
+                <button type="submit" class="w-full bg-[#6BD425] hover:bg-[#58b21e] text-slate-950 font-bold py-3.5 rounded-xl transition text-xs shadow-md">
+                    Salvar Alterações do Pet
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: PET DETAILS -->
+    <div id="modal-details" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-[#1C0118] border border-[#370926] rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden my-8">
+            <div id="modal-details-header" class="p-6 text-white flex justify-between items-start bg-gradient-to-r from-[#42113C] to-[#370926]">
+                <div>
+                    <span id="detail-category-badge" class="bg-[#1C0118]/80 text-[#6BD425] font-bold text-xs px-3 py-1 rounded-full uppercase">🔴 PERDI UM PET</span>
+                    <h2 id="detail-pet-name" class="text-2xl font-bold mt-2">Nome do Pet</h2>
+                    <p id="detail-species-breed" class="text-xs text-slate-300">Cão • Golden Retriever</p>
+                </div>
+                <button onclick="closeDetailsModal()" class="text-slate-400 hover:text-white bg-slate-950/40 p-2 rounded-xl">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div class="rounded-2xl overflow-hidden h-56 bg-[#370926] border border-[#42113C]">
+                        <img id="detail-image" src="" alt="Pet Photo" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/400x300/370926/ffffff?text=Sem+Foto'">
                     </div>
                     <div class="space-y-4 text-xs">
-                        <div class="bg-[#370926]/40 p-4 rounded-2xl border border-[#370926] space-y-2">
-                            <p class="text-slate-300"><strong class="text-white">Protocolo:</strong> <span id="detail-protocol" class="font-mono text-[#6BD425]">PRT-00000</span></p>
-                            <p id="detail-location" class="text-slate-300"><i class="fa-solid fa-location-dot text-[#6BD425] mr-1"></i> Endereço</p>
-                            <p class="text-slate-300"><strong class="text-white">Data do Ocorrido:</strong> <span id="detail-date">00/00/0000</span></p>
-                            <p class="text-slate-300"><strong class="text-white">Status Atual:</strong> <span id="detail-status" class="text-[#6BD425] font-semibold">Em Busca</span></p>
+                        <div class="bg-[#370926]/40 border border-[#42113C] p-3.5 rounded-xl space-y-2">
+                            <p id="detail-location"><i class="fa-solid fa-location-dot text-[#6BD425] mr-1"></i> Endereço</p>
+                            <p><i class="fa-regular fa-calendar text-[#6BD425] mr-1"></i> Data: <strong id="detail-date" class="text-white">--</strong></p>
+                            <p><i class="fa-solid fa-circle-info text-[#6BD425] mr-1"></i> Status: <strong id="detail-status" class="text-white">--</strong></p>
+                            <p><i class="fa-solid fa-user text-[#6BD425] mr-1"></i> Tutor/Responsável: <strong id="detail-reporter-name" class="text-white">--</strong></p>
                         </div>
-
-                        <div id="detail-reward-box" class="hidden bg-[#618B25]/20 border border-[#618B25]/40 p-3.5 rounded-2xl">
-                            <p class="text-[11px] font-bold text-[#6BD425] uppercase">Recompensa Oferecida</p>
-                            <p id="detail-reward-val" class="text-sm font-bold text-white mt-0.5">R$ 0,00</p>
+                        <div id="detail-reward-box" class="hidden bg-[#618B25]/20 border border-[#618B25]/40 p-3.5 rounded-xl">
+                            <p class="text-slate-300"><i class="fa-solid fa-award text-[#6BD425] mr-1"></i> Recompensa Oferecida:</p>
+                            <p id="detail-reward-val" class="text-sm font-bold text-[#6BD425] mt-0.5">R$ 0,00</p>
                         </div>
                     </div>
                 </div>
 
                 <div>
-                    <h4 class="font-bold text-xs text-slate-300 uppercase tracking-wider mb-2">Descrição e Sinais Particulares</h4>
-                    <p id="detail-description" class="text-xs text-slate-200 bg-[#370926]/20 p-4 rounded-2xl border border-[#370926] leading-relaxed">Nenhuma descrição informada.</p>
+                    <h4 class="font-bold text-xs text-slate-300 uppercase mb-2">Descrição e Observações</h4>
+                    <p id="detail-description" class="text-xs text-slate-400 bg-[#370926]/40 border border-[#42113C] p-4 rounded-xl leading-relaxed">
+                        Nenhuma informação adicional.
+                    </p>
                 </div>
 
-                <div class="pt-2 border-t border-[#370926] flex justify-between items-center text-xs">
-                    <span class="text-slate-400">Cadastrado por: <strong id="detail-reporter-name" class="text-slate-200">Tutor</strong></span>
-                    <button onclick="closeDetailsModal(); openChatThread(activeDetailPet.id); switchTab('messages-view');" class="bg-[#6BD425] hover:bg-[#58b21e] text-slate-950 font-bold px-4 py-2.5 rounded-xl transition shadow-sm flex items-center gap-2">
-                        <i class="fa-solid fa-comment-dots"></i> Enviar Mensagem ao Tutor
+                <div class="pt-4 border-t border-[#370926] flex items-center justify-between">
+                    <span class="font-mono text-xs text-slate-500">Protocolo: <span id="detail-protocol" class="text-white font-bold">--</span></span>
+                    <button onclick="openChatWithPet(activeDetailPet.id)" class="bg-[#6BD425] hover:bg-[#58b21e] text-slate-950 font-bold px-6 py-3 rounded-xl transition text-xs flex items-center gap-2 shadow-md">
+                        <i class="fa-solid fa-comments"></i> Enviar Mensagem ao Tutor
                     </button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Modal: Registrar Ocorrência -->
-    <div id="modal-register" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-[#1C0118] border border-[#370926] rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-            <div class="p-6 text-white flex justify-between items-center bg-[#370926] border-b border-[#42113C]">
-                <div>
-                    <h2 class="font-bold text-lg text-white">Registrar Nova Ocorrência</h2>
-                    <p class="text-xs text-slate-400">Informe os dados do pet perdido ou encontrado</p>
-                </div>
-                <button onclick="closeRegisterModal()" class="text-slate-400 hover:text-white p-2">
-                    <i class="fa-solid fa-xmark text-xl"></i>
+    <!-- MODAL: REGISTER NEW ACCOUNT -->
+    <div id="modal-register-account" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-[#1C0118] border border-[#370926] rounded-3xl shadow-2xl max-w-md w-full p-8 space-y-6">
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-lg text-white">Cadastrar Nova Conta de Tutor</h3>
+                <button onclick="closeRegisterAccountModal()" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
                 </button>
             </div>
 
-            <form id="register-pet-form" onsubmit="handlePetRegistration(event)" class="p-6 overflow-y-auto space-y-4 custom-scrollbar flex-1">
+            <div id="reg-acc-error" class="hidden bg-red-950/80 border border-red-800 text-red-200 text-xs px-4 py-3 rounded-xl"></div>
+
+            <form id="form-register-account" onsubmit="handleCreateAccount(event)" class="space-y-4">
                 <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Tipo de Ocorrência</label>
-                    <div class="grid grid-cols-2 gap-3">
-                        <label class="flex items-center gap-2 p-3 rounded-xl bg-[#370926] border border-[#42113C] cursor-pointer hover:border-[#6BD425]">
-                            <input type="radio" name="reg-category" value="PERDI" checked class="text-[#6BD425] focus:ring-0">
-                            <span class="text-xs font-bold text-slate-200">🔴 Perdi um Pet</span>
-                        </label>
-                        <label class="flex items-center gap-2 p-3 rounded-xl bg-[#370926] border border-[#42113C] cursor-pointer hover:border-[#6BD425]">
-                            <input type="radio" name="reg-category" value="ACHEI" class="text-[#6BD425] focus:ring-0">
-                            <span class="text-xs font-bold text-slate-200">🔵 Achei um Pet</span>
-                        </label>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Nome Completo</label>
+                    <input type="text" id="reg-acc-name" required placeholder="Seu nome" class="w-full bg-[#370926] border border-[#42113C] text-slate-100 placeholder-slate-400 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-[#6BD425]">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">E-mail</label>
+                    <input type="email" id="reg-acc-email" required placeholder="seu@email.com" class="w-full bg-[#370926] border border-[#42113C] text-slate-100 placeholder-slate-400 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-[#6BD425]">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Senha (Mín. 8 dígitos, 1 maiúscula, 1 número)</label>
+                    <input type="password" id="reg-acc-password" required placeholder="••••••••" class="w-full bg-[#370926] border border-[#42113C] text-slate-100 placeholder-slate-400 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-[#6BD425]">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Telefone / WhatsApp</label>
+                        <input type="text" id="reg-acc-phone" required placeholder="(15) 99999-9999" class="w-full bg-[#370926] border border-[#42113C] text-slate-100 placeholder-slate-400 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-[#6BD425]">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Cidade</label>
+                        <input type="text" id="reg-acc-city" required placeholder="Itapetininga - SP" class="w-full bg-[#370926] border border-[#42113C] text-slate-100 placeholder-slate-400 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-[#6BD425]">
                     </div>
                 </div>
+                <button type="submit" class="w-full bg-[#6BD425] hover:bg-[#58b21e] text-slate-950 font-bold py-3 rounded-xl transition text-xs shadow-md">
+                    Criar Conta
+                </button>
+            </form>
+        </div>
+    </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <!-- MODAL: REGISTER PET -->
+    <div id="modal-register" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-[#1C0118] border border-[#370926] rounded-3xl shadow-2xl max-w-xl w-full p-8 space-y-6 my-8">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h3 class="font-bold text-lg text-white">Cadastrar Ocorrência de Pet</h3>
+                    <p class="text-xs text-slate-400">Preencha os dados do pet perdido ou encontrado.</p>
+                </div>
+                <button onclick="closeRegisterModal()" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form id="form-register" onsubmit="handlePetRegistration(event)" class="space-y-4">
+                <!-- Category radios -->
+                <div class="grid grid-cols-2 gap-4">
+                    <label class="flex items-center gap-2 p-3 rounded-xl bg-[#370926] border border-[#42113C] cursor-pointer hover:border-[#6BD425]">
+                        <input type="radio" name="reg-category" value="PERDI" checked class="text-[#6BD425]">
+                        <span class="text-xs font-bold text-white">🔴 Perdi um Pet</span>
+                    </label>
+                    <label class="flex items-center gap-2 p-3 rounded-xl bg-[#370926] border border-[#42113C] cursor-pointer hover:border-[#6BD425]">
+                        <input type="radio" name="reg-category" value="ACHEI" class="text-[#6BD425]">
+                        <span class="text-xs font-bold text-white">🔵 Achei um Pet</span>
+                    </label>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-1">Nome do Pet (ou Apelido)</label>
-                        <input type="text" id="reg-name" required placeholder="Ex: Mel, Thor, Sem Nome..." class="w-full text-xs bg-[#370926] border border-[#42113C] rounded-xl p-3 text-slate-200 outline-none focus:ring-1 focus:ring-[#6BD425]">
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Nome do Pet (ou Apelido)</label>
+                        <input type="text" id="reg-name" required placeholder="Ex: Mel, Thor..." class="w-full bg-[#370926] border border-[#42113C] text-slate-100 placeholder-slate-400 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-[#6BD425]">
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-1">Espécie</label>
-                        <select id="reg-species" class="w-full text-xs bg-[#370926] border border-[#42113C] rounded-xl p-3 text-slate-200 outline-none focus:ring-1 focus:ring-[#6BD425]">
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Espécie</label>
+                        <select id="reg-species" class="w-full bg-[#370926] border border-[#42113C] text-slate-200 text-xs rounded-xl px-3 py-2.5 focus:outline-none focus:border-[#6BD425]">
                             <option value="Cão">Cão</option>
                             <option value="Gato">Gato</option>
                             <option value="Ave">Ave</option>
-                            <option value="Animais de Criação">Animal de Criação</option>
                             <option value="Outros">Outros</option>
                         </select>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-1">Raça</label>
-                        <input type="text" id="reg-breed" placeholder="Ex: Poodle, SRD, Siamês..." class="w-full text-xs bg-[#370926] border border-[#42113C] rounded-xl p-3 text-slate-200 outline-none focus:ring-1 focus:ring-[#6BD425]">
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Raça</label>
+                        <input type="text" id="reg-breed" placeholder="Ex: Poodle, SRD..." class="w-full bg-[#370926] border border-[#42113C] text-slate-100 placeholder-slate-400 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-[#6BD425]">
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-1">Cor Predominante</label>
-                        <input type="text" id="reg-color" placeholder="Ex: Preto e Branco, Dourado..." class="w-full text-xs bg-[#370926] border border-[#42113C] rounded-xl p-3 text-slate-200 outline-none focus:ring-1 focus:ring-[#6BD425]">
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-1">Data do Ocorrido</label>
-                        <input type="date" id="reg-date" required class="w-full text-xs bg-[#370926] border border-[#42113C] rounded-xl p-3 text-slate-200 outline-none focus:ring-1 focus:ring-[#6BD425]">
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Cor Predominante</label>
+                        <input type="text" id="reg-color" required placeholder="Ex: Preto e Branco" class="w-full bg-[#370926] border border-[#42113C] text-slate-100 placeholder-slate-400 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-[#6BD425]">
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-1">Telefone de Contato / WhatsApp</label>
-                        <input type="text" id="reg-contact" required placeholder="(15) 99999-9999" class="w-full text-xs bg-[#370926] border border-[#42113C] rounded-xl p-3 text-slate-200 outline-none focus:ring-1 focus:ring-[#6BD425]">
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Data do Ocorrido</label>
+                        <input type="date" id="reg-date" required class="w-full bg-[#370926] border border-[#42113C] text-slate-100 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:border-[#6BD425]">
                     </div>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Endereço Aproximado ou Bairro</label>
-                    <input type="text" id="reg-address" required placeholder="Ex: Rua das Flores, 123 - Centro" class="w-full text-xs bg-[#370926] border border-[#42113C] rounded-xl p-3 text-slate-200 outline-none focus:ring-1 focus:ring-[#6BD425]">
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Endereço / Bairro / Referência</label>
+                    <input type="text" id="reg-address" required placeholder="Ex: Rua das Palmeiras, Centro" class="w-full bg-[#370926] border border-[#42113C] text-slate-100 placeholder-slate-400 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-[#6BD425]">
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-1">URL da Foto ou Arquivo do Computador</label>
-                        <div class="flex gap-2 mb-2">
-                            <input type="url" id="reg-photo" oninput="previewRegistrationPhoto()" placeholder="https://exemplo.com/foto.jpg" class="flex-1 text-xs bg-[#370926] border border-[#42113C] rounded-xl p-3 text-slate-200 outline-none focus:ring-1 focus:ring-[#6BD425]">
-                            <button type="button" onclick="loadSamplePhoto()" class="bg-[#370926] hover:bg-[#42113C] text-[#6BD425] text-xs px-3 py-2.5 rounded-xl border border-[#6BD425]/30">Exemplo</button>
-                        </div>
-                        <div>
-                            <label class="block text-[11px] text-[#6BD425] mb-1 font-semibold cursor-pointer flex items-center gap-1.5">
-                                <i class="fa-solid fa-laptop-file"></i> Ou envie um arquivo do seu computador:
-                            </label>
-                            <input type="file" id="reg-local-file" accept="image/*" onchange="handleLocalFileUpload(event)" class="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-[#370926] file:text-[#6BD425] hover:file:bg-[#42113C] cursor-pointer">
-                        </div>
+                <div class="space-y-2">
+                    <label class="block text-xs font-semibold text-slate-300">Foto do Pet (URL ou Arquivo)</label>
+                    <div class="flex gap-2">
+                        <input type="url" id="reg-photo" oninput="previewRegistrationPhoto()" placeholder="https://exemplo.com/foto.jpg" class="flex-1 bg-[#370926] border border-[#42113C] text-slate-100 placeholder-slate-400 rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-[#6BD425]">
+                        <label class="bg-[#370926] hover:bg-[#42113C] text-[#6BD425] border border-[#6BD425]/40 text-xs px-4 py-2 rounded-xl cursor-pointer transition flex items-center gap-1.5 font-medium">
+                            <i class="fa-solid fa-upload"></i> Arquivo
+                            <input type="file" accept="image/*" onchange="handleLocalFileUpload(event)" class="hidden">
+                        </label>
+                        <button type="button" onclick="loadSamplePhoto()" class="bg-[#370926] hover:bg-[#42113C] text-slate-300 text-xs px-3 py-2 rounded-xl border border-[#42113C]">Exemplo</button>
                     </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-300 mb-1">Recompensa (Opcional)</label>
-                        <input type="text" id="reg-reward" placeholder="Ex: R$ 200,00" class="w-full text-xs bg-[#370926] border border-[#42113C] rounded-xl p-3 text-slate-200 outline-none focus:ring-1 focus:ring-[#6BD425]">
+                    <div id="photo-preview-container" class="hidden mt-2 w-24 h-24 rounded-xl overflow-hidden border border-[#6BD425]/40">
+                        <img id="photo-preview" src="" alt="Preview" class="w-full h-full object-cover">
                     </div>
                 </div>
 
-                <div id="photo-preview-container" class="hidden">
-                    <p class="text-xs text-slate-400 mb-1">Prévia da Foto:</p>
-                    <img id="photo-preview" class="w-32 h-32 object-cover rounded-xl border border-[#42113C]" src="" alt="Prévia">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Telefone de Contato</label>
+                        <input type="text" id="reg-contact" required placeholder="(15) 99999-9999" class="w-full bg-[#370926] border border-[#42113C] text-slate-100 placeholder-slate-400 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-[#6BD425]">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Recompensa (Opcional)</label>
+                        <input type="text" id="reg-reward" placeholder="Ex: R$ 200,00" class="w-full bg-[#370926] border border-[#42113C] text-slate-100 placeholder-slate-400 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-[#6BD425]">
+                    </div>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Descrição Detalhada e Sinais Particulares</label>
-                    <textarea id="reg-description" rows="3" placeholder="Coleira azul, muito assustado, mancha branca na pata..." class="w-full text-xs bg-[#370926] border border-[#42113C] rounded-xl p-3 text-slate-200 outline-none focus:ring-1 focus:ring-[#6BD425] custom-scrollbar"></textarea>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Descrição Detalhada</label>
+                    <textarea id="reg-description" rows="3" placeholder="Coleira azul, muito assustado, responde pelo nome..." class="w-full bg-[#370926] border border-[#42113C] text-slate-100 placeholder-slate-400 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-[#6BD425]"></textarea>
                 </div>
 
-                <div class="pt-3 border-t border-[#370926] flex justify-end gap-3">
-                    <button type="button" onclick="closeRegisterModal()" class="bg-[#370926] hover:bg-[#42113C] text-slate-300 font-medium px-5 py-2.5 rounded-xl text-xs transition">Cancelar</button>
-                    <button type="submit" class="bg-[#6BD425] hover:bg-[#58b21e] text-slate-950 font-bold px-6 py-2.5 rounded-xl text-xs transition shadow-sm">Cadastrar Ocorrência</button>
-                </div>
+                <button type="submit" class="w-full bg-[#6BD425] hover:bg-[#58b21e] text-slate-950 font-bold py-3.5 rounded-xl transition text-xs shadow-md">
+                    Publicar Ocorrência no Radar
+                </button>
             </form>
         </div>
     </div>
